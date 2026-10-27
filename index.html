@@ -128,6 +128,7 @@
       <button class="yes" id="btnYes" disabled>✓ Gewusst</button>
     </div>
     <div class="session" id="session"></div>
+    <button class="reset" id="resetLearn">↺ Alles auf 0 setzen</button>
   </section>
 
   <section id="stats" hidden style="flex-direction:column;gap:16px">
@@ -293,12 +294,14 @@ function switchTab(stats) {
   if (stats) { statsMode = state.mode; renderStats(); }
 }
 document.querySelectorAll("[data-smode]").forEach(b => b.addEventListener("click", () => { statsMode = b.dataset.smode; renderStats(); }));
-document.getElementById("reset").addEventListener("click", () => {
-  if (!confirm("Wirklich alle gespeicherten Ergebnisse löschen?")) return;
+function resetAll() {
+  if (!confirm("Wirklich alles auf 0 setzen? Alle gespeicherten Ergebnisse werden gelöscht.")) return;
   state.results = { task: {}, result: {} };
   session = { right: 0, wrong: 0 };
-  save(); renderStats(); render();
-});
+  save(); renderStats(); nextCard();
+}
+document.getElementById("reset").addEventListener("click", resetAll);
+document.getElementById("resetLearn").addEventListener("click", resetAll);
 
 document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("active", x.dataset.mode === state.mode));
 renderRows();
