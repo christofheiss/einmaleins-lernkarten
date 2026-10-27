@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4f46e5">
+<title>1×1 Lernkarten</title>
+<style>
+  :root {
+    --bg: #f4f3ff;
+    --card: #ffffff;
+    --card-back: #eef2ff;
+    --text: #1e1b4b;
+    --muted: #6b7280;
+    --accent: #4f46e5;
+    --good: #16a34a;
+    --bad: #dc2626;
+    --border: #e0e7ff;
+    --shadow: 0 10px 30px rgba(79, 70, 229, .15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12111f;
+      --card: #1e1d33;
+      --card-back: #272552;
+      --text: #eef2ff;
+      --muted: #a1a1c2;
+      --accent: #818cf8;
+      --good: #4ade80;
+      --bad: #f87171;
+      --border: #2e2c55;
+      --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  main { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 1.6rem; margin: 4px 0 0; text-align: center; }
+  .tabs, .modes { display: flex; gap: 8px; }
+  .tabs button, .modes button {
+    flex: 1; padding: 10px; border-radius: 12px; border: 2px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 1rem; font-weight: 600; cursor: pointer;
+  }
+  .tabs button.active, .modes button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rows { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .rows button {
+    padding: 8px 0; border-radius: 10px; border: 2px solid var(--border); background: var(--card);
+    color: var(--muted); font-size: 1rem; font-weight: 700; cursor: pointer;
+  }
+  .rows button.on { border-color: var(--accent); color: var(--accent); }
+  .label { font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+
+  .scene { perspective: 1200px; height: 300px; cursor: pointer; user-select: none; }
+  .flip { position: relative; width: 100%; height: 100%; transition: transform .5s; transform-style: preserve-3d; }
+  .flip.flipped { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: 24px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: var(--card); box-shadow: var(--shadow); border: 2px solid var(--border); padding: 16px; text-align: center;
+  }
+  .face.back { transform: rotateY(180deg); background: var(--card-back); }
+  .big { font-size: 4rem; font-weight: 800; letter-spacing: .02em; }
+  .hint { font-size: .9rem; color: var(--muted); }
+  .list { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; font-size: 1.6rem; font-weight: 700; }
+  .list.many { font-size: 1.3rem; }
+
+  .answer { display: flex; gap: 10px; }
+  .answer button {
+    flex: 1; padding: 16px; border: none; border-radius: 16px; font-size: 1.15rem; font-weight: 700; color: #fff; cursor: pointer;
+  }
+  .answer button:disabled { opacity: .35; cursor: default; }
+  .yes { background: var(--good); }
+  .no { background: var(--bad); }
+  .session { text-align: center; color: var(--muted); font-size: .95rem; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; font-size: .75rem; }
+  .stats-grid div { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; }
+  .stats-grid .h { color: var(--muted); }
+  .c-none { background: var(--border); color: var(--muted); }
+  .c-bad { background: var(--bad); color: #fff; }
+  .c-mid { background: #f59e0b; color: #fff; }
+  .c-good { background: var(--good); color: #fff; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .summary div { background: var(--card); border: 2px solid var(--border); border-radius: 14px; padding: 10px; text-align: center; }
+  .summary b { display: block; font-size: 1.5rem; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: .8rem; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -2px; background: var(--c); }
+  .reset { padding: 12px; border-radius: 12px; border: 2px solid var(--bad); background: transparent; color: var(--bad); font-weight: 700; font-size: 1rem; cursor: pointer; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>1×1 Lernkarten</h1>
+
+  <div class="tabs">
+    <button id="tabLearn" class="active">Lernen</button>
+    <button id="tabStats">Ergebnisse</button>
+  </div>
+
+  <section id="learn" style="display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div class="label">Richtung</div>
+      <div class="modes">
+        <button data-mode="task" class="active">Rechnung → Ergebnis</button>
+        <button data-mode="result">Ergebnis → Rechnungen</button>
+      </div>
+    </div>
+    <div>
+      <div class="label">Welche Reihen?</div>
+      <div class="rows" id="rows"></div>
+    </div>
+
+    <div class="scene" id="scene" role="button" aria-label="Karte umdrehen">
+      <div class="flip" id="flip">
+        <div class="face front"><div class="big" id="front"></div><div class="hint">Tippen zum Umdrehen</div></div>
+        <div class="face back"><div id="back"></div></div>
+      </div>
+    </div>
+
+    <div class="answer">
+      <button class="no" id="btnNo" disabled>✗ Nicht gewusst</button>
+      <button class="yes" id="btnYes" disabled>✓ Gewusst</button>
+    </div>
+    <div class="session" id="session"></div>
+  </section>
+
+  <section id="stats" hidden style="flex-direction:column;gap:16px">
+    <div class="modes">
+      <button data-smode="task" class="active">Rechnung → Ergebnis</button>
+      <button data-smode="result">Ergebnis → Rechnungen</button>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div class="stats-grid" id="grid"></div>
+    <div class="legend">
+      <span style="--c:var(--good)">meist gewusst</span>
+      <span style="--c:#f59e0b">teils</span>
+      <span style="--c:var(--bad)">meist falsch</span>
+      <span style="--c:var(--border)">noch nicht geübt</span>
+    </div>
+    <button class="reset" id="reset">Alle Ergebnisse löschen</button>
+  </section>
+</main>
+
+<script>
+const KEY = "einmaleins-v1";
+const defaults = { mode: "task", rows: [1,2,3,4,5,6,7,8,9,10], results: { task: {}, result: {} } };
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.results) return { ...defaults, ...s, results: { task: {}, result: {}, ...s.results } };
+  } catch (e) {}
+  return structuredClone(defaults);
+}
+let state = load();
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+let card = null, flipped = false, session = { right: 0, wrong: 0 }, lastKey = null, statsMode = "task";
+
+// Alle Rechnungen aus dem kleinen 1×1, die dieses Ergebnis haben
+function tasksFor(n) {
+  const out = [];
+  for (let a = 1; a <= 10; a++) for (let b = 1; b <= 10; b++) if (a * b === n) out.push(`${a} × ${b}`);
+  return out;
+}
+
+function deck() {
+  if (state.mode === "task") {
+    const cards = [];
+    for (const a of state.rows) for (let b = 1; b <= 10; b++) cards.push({ key: `${a}x${b}`, a, b });
+    return cards;
+  }
+  const products = new Set();
+  for (const a of state.rows) for (let b = 1; b <= 10; b++) products.add(a * b);
+  return [...products].sort((x, y) => x - y).map(n => ({ key: String(n), n }));
+}
+
+// Karten, die oft falsch oder neu sind, kommen häufiger dran
+function weight(key) {
+  const r = state.results[state.mode][key];
+  if (!r) return 4;
+  return Math.max(1, 1 + r.w * 2 - r.r + (r.last === false ? 3 : 0));
+}
+
+function nextCard() {
+  const cards = deck();
+  if (!cards.length) { card = null; render(); return; }
+  const pool = cards.length > 1 ? cards.filter(c => c.key !== lastKey) : cards;
+  let total = pool.reduce((s, c) => s + weight(c.key), 0), pick = Math.random() * total;
+  card = pool.find(c => (pick -= weight(c.key)) < 0) || pool[0];
+  lastKey = card.key;
+  flipped = false;
+  render();
+}
+
+function render() {
+  const flip = document.getElementById("flip");
+  const front = document.getElementById("front"), back = document.getElementById("back");
+  flip.classList.toggle("flipped", flipped);
+  document.getElementById("btnYes").disabled = !flipped || !card;
+  document.getElementById("btnNo").disabled = !flipped || !card;
+  if (!card) { front.textContent = "Wähle eine Reihe"; back.textContent = ""; return; }
+  const show = () => {
+    if (state.mode === "task") {
+      front.textContent = `${card.a} × ${card.b}`;
+      back.innerHTML = `<div class="big">${card.a * card.b}</div>`;
+    } else {
+      front.textContent = card.n;
+      const t = tasksFor(card.n);
+      back.innerHTML = `<div class="list${t.length > 4 ? " many" : ""}">${t.map(x => `<span>${x}</span>`).join("")}</div>`;
+    }
+  };
+  // Beim Zurückdrehen den neuen Inhalt erst nach der Animation zeigen, damit das Ergebnis nicht durchblitzt
+  if (!flipped && flip.dataset.shown === "1") setTimeout(show, 250); else show();
+  flip.dataset.shown = flipped ? "1" : "0";
+  document.getElementById("session").textContent =
+    `Diese Runde: ${session.right} gewusst · ${session.wrong} nicht gewusst`;
+}
+
+function answer(ok) {
+  if (!flipped || !card) return;
+  const res = state.results[state.mode];
+  const r = res[card.key] || { r: 0, w: 0 };
+  ok ? r.r++ : r.w++;
+  r.last = ok;
+  res[card.key] = r;
+  ok ? session.right++ : session.wrong++;
+  save();
+  nextCard();
+}
+
+function renderRows() {
+  document.getElementById("rows").innerHTML = Array.from({ length: 10 }, (_, i) => i + 1)
+    .map(n => `<button data-row="${n}" class="${state.rows.includes(n) ? "on" : ""}">${n}er</button>`).join("");
+}
+
+function color(r) {
+  if (!r) return "c-none";
+  const q = r.r / (r.r + r.w);
+  return q >= .75 ? "c-good" : q >= .4 ? "c-mid" : "c-bad";
+}
+
+function renderStats() {
+  document.querySelectorAll("[data-smode]").forEach(b => b.classList.toggle("active", b.dataset.smode === statsMode));
+  const res = state.results[statsMode];
+  let right = 0, wrong = 0, cells = '<div class="h">×</div>';
+  for (let b = 1; b <= 10; b++) cells += `<div class="h">${b}</div>`;
+  for (let a = 1; a <= 10; a++) {
+    cells += `<div class="h">${a}</div>`;
+    for (let b = 1; b <= 10; b++) {
+      const r = statsMode === "task" ? res[`${a}x${b}`] : res[String(a * b)];
+      cells += `<div class="${color(r)}" title="${a} × ${b} = ${a * b}">${a * b}</div>`;
+    }
+  }
+  for (const r of Object.values(res)) { right += r.r; wrong += r.w; }
+  const total = right + wrong;
+  document.getElementById("grid").innerHTML = cells;
+  document.getElementById("summary").innerHTML =
+    `<div><b>${right}</b>gewusst</div><div><b>${wrong}</b>nicht gewusst</div>` +
+    `<div><b>${total ? Math.round(right / total * 100) : 0}%</b>richtig</div>`;
+}
+
+document.getElementById("scene").addEventListener("click", () => { if (card) { flipped = !flipped; render(); } });
+document.getElementById("btnYes").addEventListener("click", () => answer(true));
+document.getElementById("btnNo").addEventListener("click", () => answer(false));
+
+document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => {
+  state.mode = b.dataset.mode;
+  document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("active", x === b));
+  save(); lastKey = null; nextCard();
+}));
+document.getElementById("rows").addEventListener("click", e => {
+  const n = Number(e.target.dataset.row);
+  if (!n) return;
+  state.rows = state.rows.includes(n) ? state.rows.filter(x => x !== n) : [...state.rows, n].sort((x, y) => x - y);
+  save(); renderRows(); nextCard();
+});
+
+document.getElementById("tabLearn").addEventListener("click", () => switchTab(false));
+document.getElementById("tabStats").addEventListener("click", () => switchTab(true));
+function switchTab(stats) {
+  document.getElementById("learn").hidden = stats;
+  document.getElementById("stats").hidden = !stats;
+  document.getElementById("stats").style.display = stats ? "flex" : "";
+  document.getElementById("tabLearn").classList.toggle("active", !stats);
+  document.getElementById("tabStats").classList.toggle("active", stats);
+  if (stats) { statsMode = state.mode; renderStats(); }
+}
+document.querySelectorAll("[data-smode]").forEach(b => b.addEventListener("click", () => { statsMode = b.dataset.smode; renderStats(); }));
+document.getElementById("reset").addEventListener("click", () => {
+  if (!confirm("Wirklich alle gespeicherten Ergebnisse löschen?")) return;
+  state.results = { task: {}, result: {} };
+  session = { right: 0, wrong: 0 };
+  save(); renderStats(); render();
+});
+
+document.querySelectorAll("[data-mode]").forEach(x => x.classList.toggle("active", x.dataset.mode === state.mode));
+renderRows();
+nextCard();
+</script>
+</body>
+</html>
